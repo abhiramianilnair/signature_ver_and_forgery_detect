@@ -1,0 +1,216 @@
+import numpy as np
+import matplotlib.pyplot as plt
+imgForged = plt.imread('./input/sample_Signature/forged/NFI-00301001.png')
+plt.imshow(imgForged)
+
+imgGenuine = plt.imread('./input/sample_Signature/genuine/NFI-00101001.png')
+plt.imshow(imgGenuine)
+
+we create two list to store all genuine and forged sign respectively
+import glob
+
+genuine = [glob.glob('./input/Dataset/dataset1/real/.'),
+       glob.glob('./input/Dataset/dataset2/real/.'),
+       glob.glob('./input/Dataset/dataset3/real/.'),
+       glob.glob('./input/Dataset/dataset4/real1/.')]
+                 
+forged = [glob.glob('./input/Dataset/dataset1/forge/.'),
+        glob.glob('.input/Dataset/dataset2/forge/.'),
+        glob.glob('./input/Dataset/dataset3/forge/.'),
+        glob.glob('./input/Dataset/dataset4/forge/.')]
+The first 3 datasets are used for training and the 4th dataset is used for testing
+import keras
+import cv2
+
+
+train_data = []
+train_labels = []
+
+test_data = []
+test_labels = []
+
+for data in range(len(genuine)):
+    for i in genuine[data]:
+        if data == 3:
+            image = cv2.imread(i)
+            image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+            image = cv2.resize(image, (512, 512))
+            test_data.append(image)
+            test_labels.append(0)
+        else:
+            image = cv2.imread(i)
+            image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+            image = cv2.resize(image, (512, 512))
+            train_data.append(image)
+            train_labels.append(0)
+        
+for data in range(len(forged)):
+    for j in forged[data]:
+        if data == 3:
+            image = cv2.imread(j)
+            image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+            image = cv2.resize(image, (512, 512))
+            test_data.append(image)
+            test_labels.append(1)
+        else:
+            image = cv2.imread(j)
+            image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+            image = cv2.resize(image, (512, 512))
+            train_data.append(image)
+            train_labels.append(1)
+
+train_data = np.array(train_data)/255.0
+train_labels = np.array(train_labels)
+
+test_data = np.array(test_data)/255.0
+test_labels = np.array(test_labels)
+train_data.shape
+from sklearn.utils import shuffle
+train_data,train_labels = shuffle(train_data,train_labels)
+
+test_data,test_labels = shuffle(test_data,test_labels)
+preprocessing and building the model
+from keras.models import Sequential
+from keras.layers import Conv2D,MaxPooling2D,Flatten,Dense,Dropout
+from keras_preprocessing.image import ImageDataGenerator
+from sklearn.metrics import confusion_matrix
+from tensorflow.keras.optimizers import Adam
+from tensorflow.keras.layers import Dense, Flatten, Input, Lambda, MaxPooling2D, Conv2D, Dropout, BatchNormalization
+
+
+model = Sequential()
+
+Image_Width = 512
+Image_Height = 512
+Image_Size = (Image_Width, Image_Height)
+Image_Channel = 3
+
+
+## Conv layer 1
+model.add(Conv2D(32, (3,3), activation='relu', input_shape=(Image_Width,Image_Height, Image_Channel)))
+model.add(BatchNormalization())
+model.add(MaxPooling2D(pool_size=(2,2)))
+model.add(Dropout(0.25))
+
+## Conv layer 2
+model.add(Conv2D(64, (3,3), activation='relu'))
+model.add(BatchNormalization())
+model.add(MaxPooling2D(pool_size=(2,2)))
+model.add(Dropout(0.25))
+
+## Conv layer 3
+model.add(Conv2D(128, (3,3), activation='relu'))
+model.add(BatchNormalization())
+model.add(MaxPooling2D(pool_size=(2,2)))
+model.add(Dropout(0.25))
+
+## Conv layer 4
+model.add(Conv2D(256, (3,3), activation='relu'))
+model.add(BatchNormalization())
+model.add(MaxPooling2D(pool_size=(2,2)))
+model.add(Dropout(0.25))
+
+## Conv layer 5
+model.add(Conv2D(256, (3,3), activation='relu'))
+model.add(BatchNormalization())
+model.add(MaxPooling2D(pool_size=(2,2)))
+model.add(Dropout(0.25))
+
+## Conv layer 6
+model.add(Conv2D(512, (3,3), activation='relu'))
+model.add(BatchNormalization())
+model.add(MaxPooling2D(pool_size=(2,2)))
+model.add(Dropout(0.25))
+
+model.add(Flatten())
+model.add(Dense(256,activation='relu'))
+model.add(BatchNormalization())
+model.add(Dropout(0.5))
+
+model.add(Dense(2, activation='softmax'))
+model.add(Flatten())
+
+model.compile(loss="binary_crossentropy", optimizer='adam', metrics=['accuracy'])
+
+# model.add(Conv2D(128,(3,3),input_shape=(512,512,3),activation='relu'))
+# model.add(BatchNormalization())
+# model.add(MaxPooling2D(3,3))
+
+# model.add(Conv2D(64,(3,3),input_shape=(512,512,3),activation='relu'))
+# model.add(BatchNormalization())
+# model.add(MaxPooling2D(3,3))
+
+
+# model.add(Conv2D(32,(3,3),activation='relu'))
+# model.add(BatchNormalization())
+# model.add(MaxPooling2D(3,3))
+
+
+# model.add(Flatten())
+# model.add(Dense(128,activation = 'relu'))
+# model.add(Dropout(rate=0.3))
+# model.add(Dense(2,activation = 'softmax'))
+# model.add(Flatten())
+
+
+# model.compile(optimizer=Adam(lr=0.001),loss="binary_crossentropy",metrics=["accuracy"])
+model.summary()
+from keras.callbacks import ModelCheckpoint, LearningRateScheduler, EarlyStopping, ReduceLROnPlateau, TensorBoard
+earlyStopping = EarlyStopping(monitor='val_loss',
+                              min_delta=0,
+                              patience=3,
+                              verbose=1)
+
+callback_early_stop_reduceLROnPlateau=[earlyStopping]
+
+EPOCHS = 5
+BS = 1
+progess = model.fit(train_data,train_labels, batch_size=BS,epochs=EPOCHS, callbacks=callback_early_stop_reduceLROnPlateau,validation_split=.05)
+acc = progess.history['accuracy']
+val_acc = progess.history['val_accuracy']
+loss = progess.history['loss']
+val_loss = progess.history['val_loss']
+ 
+epochs = range(len(acc))
+ 
+plt.plot(epochs, acc, 'b', label='Training acc')
+plt.plot(epochs, val_acc, 'r', label='Validation acc')
+plt.title('Training and validation accuracy')
+plt.legend()
+
+plt.plot(epochs, loss, 'g', label='Training loss')
+plt.plot(epochs, val_loss, 'y', label='Validation loss')
+plt.title('Training and validation loss')
+plt.legend()
+ 
+plt.show()
+ 
+plt.figure()
+
+pred = model.predict(test_data)
+pred  #prob of genuine, prob of forged
+from sklearn.metrics import accuracy_score
+accuracy_score(pred.argmax(axis=1), test_labels)
+from tensorflow.keras.models import load_model
+
+model.save('AI_project_forgery_detection.h5')
+network = load_model('AI_project_forgery_detection.h5')
+testing the model against a random input
+from tensorflow.keras.preprocessing import image
+
+img = image.load_img('./input/Dataset/dataset1/real/00100001.png', target_size=(512,512))
+x = image.img_to_array(img)
+x.shape
+x = x/255
+
+from tensorflow.keras.applications.resnet50 import preprocess_input
+
+x=np.expand_dims(x,axis=0)
+img_data=preprocess_input(x)
+img_data.shape
+model.predict(img_data)
+a=np.argmax(model.predict(img_data), axis=1)
+if(a==1):
+    print("The signature is genuine")
+else:
+    print("The signature is fraud")
